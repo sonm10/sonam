@@ -1,0 +1,624 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Trace & Learn</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Andika&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --primary: #ff6b6b;
+        --secondary: #4ecdc4;
+        --bg: #f7fff7;
+        --font-main: "Andika", sans-serif;
+      }
+      body {
+        font-family: var(--font-main);
+        background-color: var(--bg);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin: 0;
+        height: 100vh;
+        user-select: none;
+        overflow-x: hidden;
+      }
+
+      #admin-menu {
+        width: 100%;
+        background: #e0e0e0;
+        padding: 8px;
+        display: flex;
+        justify-content: center;
+        z-index: 10;
+      }
+      .admin-btn {
+        background: #fdfdfd;
+        border: 1px solid #bbb;
+        padding: 5px 15px;
+        cursor: pointer;
+        border-radius: 5px;
+        font-size: 14px;
+      }
+
+      #setup-screen,
+      #game-screen,
+      #final-screen {
+        text-align: center;
+        margin-top: 30px;
+        width: 100%;
+      }
+      .hidden {
+        display: none !important;
+      }
+
+      input {
+        padding: 15px;
+        font-size: 24px;
+        border-radius: 15px;
+        border: 3px solid var(--secondary);
+        text-align: center;
+        font-family: var(--font-main);
+      }
+
+      canvas {
+        background: white;
+        border-radius: 25px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        touch-action: none;
+        cursor: crosshair;
+        margin-top: 15px;
+      }
+
+      .controls {
+        display: flex;
+        gap: 20px;
+        margin-top: 20px;
+        justify-content: center;
+      }
+      .btn-circle {
+        width: 85px;
+        height: 85px;
+        border-radius: 50%;
+        border: none;
+        color: white;
+        font-weight: bold;
+        cursor: pointer;
+        box-shadow: 0 4px 0 rgba(0, 0, 0, 0.2);
+        font-family: var(--font-main);
+        font-size: 18px;
+      }
+      .btn-clear {
+        background-color: var(--primary);
+      }
+      .btn-next {
+        background-color: var(--secondary);
+      }
+      .btn-sound {
+        background-color: #f39c12;
+      }
+
+      .comparison-container {
+        display: flex;
+        gap: 15px;
+        justify-content: center;
+        flex-wrap: wrap;
+        padding: 20px;
+        position: relative;
+        z-index: 5;
+      }
+      .result-box {
+        border: 3px solid #eee;
+        padding: 10px;
+        background: white;
+        border-radius: 15px;
+        min-width: 110px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+      }
+      .big-text {
+        font-size: 100px;
+        font-weight: bold;
+        margin: 0;
+        font-family: var(--font-main);
+      }
+
+      #message {
+        font-size: 32px;
+        color: #555;
+        min-height: 45px;
+      }
+      .main-btn {
+        padding: 15px 40px;
+        font-size: 22px;
+        background: var(--primary);
+        color: white;
+        border: none;
+        border-radius: 50px;
+        cursor: pointer;
+        font-family: var(--font-main);
+        position: relative;
+        z-index: 10;
+      }
+
+      .particle {
+        position: absolute;
+        pointer-events: none;
+        border-radius: 50%;
+        animation: pop 0.8s ease-out forwards;
+      }
+      @keyframes pop {
+        0% {
+          transform: translate(0, 0) scale(1);
+          opacity: 1;
+        }
+        100% {
+          transform: translate(var(--tx), var(--ty)) scale(0);
+          opacity: 0;
+        }
+      }
+      .lava-shake {
+        animation: shake 0.3s;
+      }
+      @keyframes shake {
+        0% {
+          transform: translateX(0);
+        }
+        25% {
+          transform: translateX(-5px);
+        }
+        75% {
+          transform: translateX(5px);
+        }
+        100% {
+          transform: translateX(0);
+        }
+      }
+      .fire-particle {
+        position: absolute;
+        pointer-events: none;
+        border-radius: 50%;
+        background: radial-gradient(circle, #ffeb3b, #ff5722);
+        z-index: 20;
+        animation: burn 0.6s ease-out forwards;
+        opacity: 0.8;
+      }
+      @keyframes burn {
+        0% {
+          transform: translate(-50%, -50%) scale(1);
+          opacity: 1;
+        }
+        100% {
+          transform: translate(-50%, -40px) scale(0);
+          opacity: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="admin-menu" class="hidden">
+      <button class="admin-btn" onclick="restartWithWarning()">
+        Start New Word (Restart)
+      </button>
+    </div>
+
+    <div id="setup-screen">
+      <h1>What are we learning?</h1>
+      <input
+        type="text"
+        id="wordInput"
+        placeholder="Enter word..."
+        maxlength="10"
+      />
+      <div style="margin: 10px">
+        <label
+          style="
+            font-family: var(--font-main);
+            font-size: 18px;
+            cursor: pointer;
+          "
+        >
+          <input type="checkbox" id="lavaMode" /> Don't Touch the Lava! 🌋
+        </label>
+      </div>
+      <br /><br />
+      <button class="main-btn" onclick="startGame()">Go!</button>
+    </div>
+
+    <div id="game-screen" class="hidden">
+      <div id="message">Trace the letter!</div>
+      <canvas id="paintCanvas" width="500" height="500"></canvas>
+      <div class="controls">
+        <button class="btn-circle btn-clear" onclick="clearCanvas()">
+          Erase
+        </button>
+        <button class="btn-circle btn-sound" onclick="toggleSound()">🔊</button>
+        <button class="btn-circle btn-next" onclick="advanceLetter()">
+          Next
+        </button>
+      </div>
+    </div>
+
+    <div id="final-screen" class="hidden">
+      <h1>Great Job!</h1>
+      <div id="comparison-gallery" class="comparison-container"></div>
+      <br />
+      <button class="main-btn" onclick="resetApp()">Play Again</button>
+    </div>
+
+    <script>
+      const canvas = document.getElementById("paintCanvas");
+      const ctx = canvas.getContext("2d");
+      let currentWord = "";
+      let currentIndex = 0;
+      let isDrawing = false;
+      let targetPixels = 0;
+      let userDrawings = [];
+      let letterMask = null;
+      let isLavaMode = false;
+      let isCurrentStrokeInLava = false;
+      let isLetterComplete = false;
+      let audioCtx = null;
+      let markerOsc = null;
+      let inactivityTimer = null;
+      let isMuted = false;
+
+      function startGame() {
+        const input = document.getElementById("wordInput").value;
+        if (!input) return;
+
+        // Init Audio Context on user gesture
+        if (!audioCtx) {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+
+        currentWord = input;
+        currentIndex = 0;
+        userDrawings = [];
+        isLavaMode = document.getElementById("lavaMode").checked;
+        document.getElementById("setup-screen").classList.add("hidden");
+        document.getElementById("game-screen").classList.remove("hidden");
+        document.getElementById("admin-menu").classList.remove("hidden");
+        loadLetter();
+      }
+
+      function loadLetter() {
+        isLetterComplete = false;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const letter = currentWord[currentIndex];
+        ctx.font = "bold 400px 'Andika'";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillStyle = "#F2F2F2";
+        ctx.fillText(letter, canvas.width / 2, canvas.height / 2);
+
+        // Capture mask for Lava mode
+        letterMask = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+        countTargetPixels();
+        document.getElementById("message").innerText =
+          `Can you trace "${letter}"?`;
+
+        speak(`Can you write the letter ${letter}?`);
+        resetInactivityTimer();
+      }
+
+      function countTargetPixels() {
+        const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+        targetPixels = 0;
+        for (let i = 3; i < data.length; i += 80)
+          if (data[i] > 0) targetPixels++;
+      }
+
+      canvas.addEventListener("mousedown", startPos);
+      canvas.addEventListener("mouseup", endPos);
+      canvas.addEventListener("mousemove", draw);
+      canvas.addEventListener("touchstart", (e) => {
+        e.preventDefault();
+        startPos(e.touches[0]);
+      });
+      canvas.addEventListener("touchend", endPos);
+      canvas.addEventListener("touchmove", (e) => {
+        e.preventDefault();
+        draw(e.touches[0]);
+      });
+
+      function startPos(e) {
+        if (isLetterComplete) return;
+        isDrawing = true;
+        isCurrentStrokeInLava = false;
+        startMarkerSound();
+        draw(e);
+      }
+      function endPos() {
+        isDrawing = false;
+        stopMarkerSound();
+        ctx.beginPath();
+        validateTrace();
+      }
+
+      function draw(e) {
+        resetInactivityTimer();
+        if (!isDrawing || isLetterComplete) return;
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        // Lava Mode Check
+        if (isLavaMode) {
+          const ix = Math.floor(x);
+          const iy = Math.floor(y);
+          if (ix >= 0 && ix < canvas.width && iy >= 0 && iy < canvas.height) {
+            const idx = (iy * canvas.width + ix) * 4;
+            // Check if we are on the letter (alpha > 0)
+            if (letterMask && letterMask.data[idx + 3] === 0) {
+              if (!isCurrentStrokeInLava) {
+                // Only play sound on first contact per stroke
+                playBoing();
+              }
+              isCurrentStrokeInLava = true;
+            }
+          }
+        }
+
+        ctx.lineWidth = 30;
+        ctx.lineCap = "round";
+
+        // Set color based on lava status, removing rainbow ink
+        if (isCurrentStrokeInLava) {
+          ctx.strokeStyle = "#ff6b6b"; // Burnt Red
+          spawnFire(x, y);
+        } else {
+          ctx.strokeStyle = "#4ecdc4"; // Standard Teal
+        }
+
+        ctx.lineTo(x, y);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+      }
+
+      function validateTrace() {
+        const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+        let hits = 0;
+        for (let i = 3; i < data.length; i += 80) {
+          // Check if pixel is colored (not transparent and not the gray background)
+          if (data[i] > 0) {
+            // Alpha > 0
+            const r = data[i - 3];
+            const g = data[i - 2];
+            const b = data[i - 1];
+            // If it's significantly different from gray #F2F2F2 (242)
+            if (r < 230 || g < 230 || b < 230) hits++;
+          }
+        }
+        if (hits > targetPixels * 0.7) onTraceSuccess();
+      }
+
+      function onTraceSuccess() {
+        if (isLetterComplete) return;
+        isLetterComplete = true;
+        playDing();
+        spawnParticles();
+        document.getElementById("message").innerText = "Perfect! Click Next.";
+      }
+
+      function advanceLetter() {
+        userDrawings.push(canvas.toDataURL());
+        currentIndex++;
+        if (currentIndex < currentWord.length) {
+          loadLetter();
+        } else {
+          showFinal();
+        }
+      }
+
+      function clearCanvas() {
+        loadLetter();
+      }
+      function restartWithWarning() {
+        if (confirm("Stop this word and start over?")) resetApp();
+      }
+
+      function showFinal() {
+        document.getElementById("game-screen").classList.add("hidden");
+        document.getElementById("admin-menu").classList.add("hidden");
+        document.getElementById("final-screen").classList.remove("hidden");
+
+        const gallery = document.getElementById("comparison-gallery");
+        gallery.innerHTML = "";
+        currentWord.split("").forEach((char, i) => {
+          const box = document.createElement("div");
+          box.className = "result-box";
+          box.innerHTML = `<div class="big-text">${char}</div><hr style="border:1px solid #eee"><img src="${userDrawings[i]}" width="90">`;
+          gallery.appendChild(box);
+        });
+      }
+
+      function resetApp() {
+        document.getElementById("setup-screen").classList.remove("hidden");
+        document.getElementById("game-screen").classList.add("hidden");
+        document.getElementById("final-screen").classList.add("hidden");
+        document.getElementById("admin-menu").classList.add("hidden");
+        document.getElementById("wordInput").value = "";
+      }
+
+      // --- New Helper Functions ---
+
+      function toggleSound() {
+        isMuted = !isMuted;
+        const btn = document.querySelector(".btn-sound");
+        btn.innerText = isMuted ? "🔇" : "🔊";
+        if (isMuted) {
+          stopMarkerSound();
+          if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+        }
+      }
+
+      let voices = [];
+      function loadVoices() {
+        voices = window.speechSynthesis.getVoices();
+      }
+      if ("speechSynthesis" in window) {
+        loadVoices();
+        window.speechSynthesis.onvoiceschanged = loadVoices;
+      }
+
+      function speak(text) {
+        if (isMuted) return;
+        if ("speechSynthesis" in window) {
+          const utterance = new SpeechSynthesisUtterance(text);
+          const voice =
+            voices.find((v) => v.name.includes("Google US English")) ||
+            voices.find((v) => v.name.includes("Samantha")) ||
+            voices.find((v) => v.name.includes("Zira")) ||
+            voices.find((v) => v.lang.startsWith("en"));
+          if (voice) utterance.voice = voice;
+          utterance.pitch = 1.1;
+          utterance.rate = 0.9;
+          window.speechSynthesis.speak(utterance);
+        }
+      }
+
+      function playDing() {
+        if (isMuted || !audioCtx) return;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(500, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(
+          1000,
+          audioCtx.currentTime + 0.1,
+        );
+        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(
+          0.01,
+          audioCtx.currentTime + 0.5,
+        );
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.5);
+      }
+
+      function playBoing() {
+        if (isMuted || !audioCtx) return;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.type = "sawtooth";
+        osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+        osc.frequency.linearRampToValueAtTime(50, audioCtx.currentTime + 0.3);
+        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.3);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.3);
+      }
+
+      function startMarkerSound() {
+        if (isMuted || !audioCtx) return;
+        if (markerOsc) return;
+        // Create pink noise buffer if not exists
+        if (!window.noiseBuffer) {
+          const bufferSize = audioCtx.sampleRate * 2;
+          const buffer = audioCtx.createBuffer(
+            1,
+            bufferSize,
+            audioCtx.sampleRate,
+          );
+          const data = buffer.getChannelData(0);
+          let lastOut = 0;
+          for (let i = 0; i < bufferSize; i++) {
+            const white = Math.random() * 2 - 1;
+            data[i] = (lastOut + 0.02 * white) / 1.02;
+            lastOut = data[i];
+            data[i] *= 3.5;
+          }
+          window.noiseBuffer = buffer;
+        }
+
+        markerOsc = audioCtx.createBufferSource();
+        markerOsc.buffer = window.noiseBuffer;
+        markerOsc.loop = true;
+        const gain = audioCtx.createGain();
+        gain.gain.value = 0.05;
+        markerOsc.connect(gain);
+        gain.connect(audioCtx.destination);
+        markerOsc.start();
+      }
+
+      function stopMarkerSound() {
+        if (markerOsc) {
+          markerOsc.stop();
+          markerOsc = null;
+        }
+      }
+
+      function spawnParticles() {
+        const rect = canvas.getBoundingClientRect();
+        const scrollX = window.scrollX || window.pageXOffset;
+        const scrollY = window.scrollY || window.pageYOffset;
+        const centerX = rect.left + scrollX + rect.width / 2;
+        const centerY = rect.top + scrollY + rect.height / 2;
+
+        for (let i = 0; i < 30; i++) {
+          const p = document.createElement("div");
+          p.className = "particle";
+          p.style.left = centerX + "px";
+          p.style.top = centerY + "px";
+          p.style.width = Math.random() * 10 + 5 + "px";
+          p.style.height = p.style.width;
+          p.style.background = `hsl(${Math.random() * 360}, 100%, 50%)`;
+
+          const angle = Math.random() * Math.PI * 2;
+          const dist = Math.random() * 200 + 50;
+          p.style.setProperty("--tx", Math.cos(angle) * dist + "px");
+          p.style.setProperty("--ty", Math.sin(angle) * dist + "px");
+
+          document.body.appendChild(p);
+          setTimeout(() => p.remove(), 1000);
+        }
+      }
+
+      function spawnFire(x, y) {
+        const rect = canvas.getBoundingClientRect();
+        const scrollX = window.scrollX || window.pageXOffset;
+        const scrollY = window.scrollY || window.pageYOffset;
+        const absoluteX = rect.left + scrollX + x;
+        const absoluteY = rect.top + scrollY + y;
+
+        for (let i = 0; i < 2; i++) {
+          const p = document.createElement("div");
+          p.className = "fire-particle";
+          const offsetX = (Math.random() - 0.5) * 30;
+          const offsetY = (Math.random() - 0.5) * 30;
+          p.style.left = absoluteX + offsetX + "px";
+          p.style.top = absoluteY + offsetY + "px";
+          const size = Math.random() * 20 + 10;
+          p.style.width = size + "px";
+          p.style.height = size + "px";
+          document.body.appendChild(p);
+          setTimeout(() => p.remove(), 600);
+        }
+      }
+
+      function resetInactivityTimer() {
+        clearTimeout(inactivityTimer);
+        inactivityTimer = setTimeout(() => {
+          if (
+            !document.getElementById("game-screen").classList.contains("hidden")
+          ) {
+            speak("Need a hint? Start here!");
+            // Visual hint: pulse the canvas
+            canvas.style.transition = "transform 0.5s";
+            canvas.style.transform = "scale(1.05)";
+            setTimeout(() => (canvas.style.transform = "scale(1)"), 500);
+          }
+        }, 5000);
+      }
+    </script>
+  </body>
+</html>
